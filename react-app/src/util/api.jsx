@@ -1,5 +1,6 @@
 export const URL = {
   LogInApi: '/user/login',
   Register: '/user/register',
-  Users: '/user/all',
+  Users: '/admin/users',
+  Stats: '/admin/stats',
 };

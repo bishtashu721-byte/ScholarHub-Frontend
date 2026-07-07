@@ -40,6 +40,11 @@ export default function SignupPage() {
     const requestData = {
       name: form.name.trim(),
       email: form.email.trim().toLowerCase(),
+      mobile: form.mobile.trim(),
+      dateOfBirth: form.dateOfBirth,
+      gender: form.gender,
+      studentType: form.studentType,
+      collegeName: form.collegeName.trim(),
       password: form.password,
       state: form.state,
       category: form.category,

@@ -11,6 +11,7 @@ import {
 } from '../data/mockData';
 
 const STORAGE_KEY = 'scholarhub-react-state-v1';
+const USERS_UPDATED_KEY = 'scholarhub-users-updated-at';
 
 const defaultState = {
   authMode: 'login',
@@ -21,6 +22,7 @@ const defaultState = {
     course: 'B.Tech Computer Science',
     year: '2nd Year',
     educationLevel: 'Undergraduate',
+    studentType: 'College',
   },
   personal: {
     fullName: 'Arjun Kumar',
@@ -31,6 +33,7 @@ const defaultState = {
     mobile: '+91 98765 43210',
   },
   academic: {
+    studentType: 'College',
     course: 'Undergraduate - Year 2',
     stream: 'Computer Science / IT',
     year: 'Semester 3',
@@ -171,6 +174,7 @@ export function AppProvider({ children }) {
   const applyRegistrationProfile = (registrationForm, response) => {
     const annualIncome = Number(registrationForm.income);
     const cgpa = Number(registrationForm.cgpa);
+    const registeredAt = new Date().toISOString();
 
     setState((current) => ({
       ...current,
@@ -178,16 +182,23 @@ export function AppProvider({ children }) {
         ...current.profile,
         name: registrationForm.name.trim(),
         email: registrationForm.email.trim().toLowerCase(),
+        phone: registrationForm.mobile.trim(),
         educationLevel: registrationForm.educationLevel,
+        studentType: registrationForm.studentType,
       },
       personal: {
         ...current.personal,
         fullName: registrationForm.name.trim(),
+        dob: registrationForm.dateOfBirth,
+        gender: registrationForm.gender,
         state: registrationForm.state,
+        mobile: registrationForm.mobile.trim(),
       },
       academic: {
         ...current.academic,
+        studentType: registrationForm.studentType,
         course: registrationForm.educationLevel,
+        institution: registrationForm.collegeName.trim(),
         marks: Number.isFinite(cgpa) ? String(cgpa) : current.academic.marks,
       },
       financial: {
@@ -200,10 +211,19 @@ export function AppProvider({ children }) {
       },
       registration: {
         status: 'registered',
-        registeredAt: new Date().toISOString(),
+        registeredAt,
         lastResponse: response,
       },
     }));
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(USERS_UPDATED_KEY, registeredAt);
+      window.dispatchEvent(
+        new CustomEvent('scholarhub:users-updated', {
+          detail: { registeredAt },
+        })
+      );
+    }
   };
 
   const updateSection = (section, updates) => {

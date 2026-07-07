@@ -182,6 +182,11 @@ export default function LandingPage() {
     const requestData = {
       name: signupForm.name.trim(),
       email: signupForm.email.trim().toLowerCase(),
+      mobile: signupForm.mobile.trim(),
+      dateOfBirth: signupForm.dateOfBirth,
+      gender: signupForm.gender,
+      studentType: signupForm.studentType,
+      collegeName: signupForm.collegeName.trim(),
       password: signupForm.password,
       state: signupForm.state,
       category: signupForm.category,
