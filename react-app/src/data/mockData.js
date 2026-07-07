@@ -31,10 +31,10 @@ export const states = [
 ];
 
 export const stepItems = [
-  { key: 'personal', label: 'Personal', description: 'Identity and location' },
-  { key: 'academic', label: 'Academic', description: 'Course and marks' },
-  { key: 'financial', label: 'Financial', description: 'Income and category' },
-  { key: 'review', label: 'Review', description: 'Final submission' },
+  { key: 'personal', label: 'Personal', description: 'Identity and location', href: '/personal-details' },
+  { key: 'academic', label: 'Academic', description: 'Course and marks', href: '/academic-details' },
+  { key: 'financial', label: 'Financial', description: 'Income and category', href: '/financial-details' },
+  { key: 'review', label: 'Review', description: 'Final submission', href: '/review-submit' },
 ];
 
 export const courseOptions = [

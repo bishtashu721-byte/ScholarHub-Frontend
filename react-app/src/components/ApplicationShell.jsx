@@ -44,9 +44,11 @@ export function ApplicationShell({
             {stepItems.map((item, index) => {
               const status =
                 index < stepIndex ? 'complete' : index === stepIndex ? 'active' : 'upcoming';
-
-              return (
-                <div className={`step-list__item step-list__item--${status}`} key={item.key}>
+              const itemClassName = `step-list__item step-list__item--${status}${
+                index <= stepIndex ? ' step-list__item--selectable' : ''
+              }`;
+              const content = (
+                <>
                   <span className="step-list__count">
                     {status === 'complete' ? 'OK' : index + 1}
                   </span>
@@ -54,6 +56,25 @@ export function ApplicationShell({
                     <strong>{item.label}</strong>
                     <p>{item.description}</p>
                   </div>
+                </>
+              );
+
+              if (index <= stepIndex) {
+                return (
+                  <Link
+                    aria-current={status === 'active' ? 'step' : undefined}
+                    className={itemClassName}
+                    key={item.key}
+                    to={item.href}
+                  >
+                    {content}
+                  </Link>
+                );
+              }
+
+              return (
+                <div className={itemClassName} key={item.key}>
+                  {content}
                 </div>
               );
             })}
@@ -102,15 +123,13 @@ export function ApplicationShell({
         </div>
 
         <div className="application-panel__header">
-          <div className="application-panel__header-actions">
-            {backTo ? (
+          {backTo ? (
+            <div className="application-panel__header-actions">
               <Link className="back-link" to={backTo}>
                 {backLabel ?? 'Back'}
               </Link>
-            ) : (
-              <span />
-            )}
-          </div>
+            </div>
+          ) : null}
           <h2>{title}</h2>
           <p>{subtitle}</p>
         </div>

@@ -3,31 +3,58 @@ import { useNavigate } from 'react-router-dom';
 import { ApplicationShell } from '../components/ApplicationShell';
 import { courseOptions, streamOptions, yearOptions } from '../data/mockData';
 import { useAppContext } from '../context/AppContext';
+import { isFieldFilled } from '../util/applicationFields';
 
 export default function AcademicDetailsPage() {
   const navigate = useNavigate();
-  const { state, updateSection } = useAppContext();
+  const { lockSectionFields, state, updateSection, saveAcademicDetails } = useAppContext();
   const [errors, setErrors] = useState({});
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const values = state.academic;
+  const lockedFields = state.lockedFields.academic;
 
   const validate = () => {
     const nextErrors = {};
-    if (!values.course) nextErrors.course = 'Select your current course or class.';
-    if (!values.stream) nextErrors.stream = 'Select your stream.';
-    if (!values.year) nextErrors.year = 'Select your year or semester.';
-    if (!values.institution.trim()) nextErrors.institution = 'Enter your institution name.';
-    if (!values.marks.trim()) nextErrors.marks = 'Enter your marks or CGPA.';
+    if (!isFieldFilled(values.course)) nextErrors.course = 'Select your current course or class.';
+    if (!isFieldFilled(values.stream)) nextErrors.stream = 'Select your stream.';
+    if (!isFieldFilled(values.year)) nextErrors.year = 'Select your year or semester.';
+    if (!isFieldFilled(values.institution)) nextErrors.institution = 'Enter your institution name.';
+    if (!isFieldFilled(values.marks)) nextErrors.marks = 'Enter your marks or CGPA.';
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setSaveError('');
     if (!validate()) {
       return;
     }
+
+    const unsavedValues = Object.keys(lockedFields).reduce((changed, field) => {
+      if (!lockedFields[field]) changed[field] = values[field];
+      return changed;
+    }, {});
+
+    setIsSaving(true);
+    try {
+      await saveAcademicDetails(unsavedValues);
+    } catch (error) {
+      if (error.code === 'ERR_NETWORK') {
+        // Backend unreachable in this environment: keep the locally-saved
+        // values and let the user continue instead of hard-blocking them.
+      } else {
+        setSaveError(error.message || 'Unable to save your details right now.');
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    setIsSaving(false);
+    lockSectionFields('academic', ['course', 'stream', 'year', 'institution', 'marks']);
     navigate('/financial-details');
   };
 
@@ -52,10 +79,11 @@ export default function AcademicDetailsPage() {
     >
       <form className="stack-form" onSubmit={handleSubmit}>
         <div className="form-grid">
-          <label className="form-field">
+          <label className={`form-field${lockedFields.course ? ' form-field--locked' : ''}`}>
             <span>Current course or class</span>
             <select
               className="input"
+              disabled={lockedFields.course}
               onChange={(event) => updateSection('academic', { course: event.target.value })}
               value={values.course}
             >
@@ -69,10 +97,11 @@ export default function AcademicDetailsPage() {
             {errors.course ? <small className="form-error">{errors.course}</small> : null}
           </label>
 
-          <label className="form-field">
+          <label className={`form-field${lockedFields.stream ? ' form-field--locked' : ''}`}>
             <span>Stream or field of study</span>
             <select
               className="input"
+              disabled={lockedFields.stream}
               onChange={(event) => updateSection('academic', { stream: event.target.value })}
               value={values.stream}
             >
@@ -88,10 +117,11 @@ export default function AcademicDetailsPage() {
         </div>
 
         <div className="form-grid">
-          <label className="form-field">
+          <label className={`form-field${lockedFields.year ? ' form-field--locked' : ''}`}>
             <span>Year or semester</span>
             <select
               className="input"
+              disabled={lockedFields.year}
               onChange={(event) => updateSection('academic', { year: event.target.value })}
               value={values.year}
             >
@@ -105,10 +135,11 @@ export default function AcademicDetailsPage() {
             {errors.year ? <small className="form-error">{errors.year}</small> : null}
           </label>
 
-          <label className="form-field">
+          <label className={`form-field${lockedFields.marks ? ' form-field--locked' : ''}`}>
             <span>Marks or CGPA</span>
             <input
               className="input"
+              disabled={lockedFields.marks}
               onChange={(event) => updateSection('academic', { marks: event.target.value })}
               placeholder="Enter marks or CGPA"
               type="text"
@@ -118,10 +149,11 @@ export default function AcademicDetailsPage() {
           </label>
         </div>
 
-        <label className="form-field">
+        <label className={`form-field${lockedFields.institution ? ' form-field--locked' : ''}`}>
           <span>Name of school or college</span>
           <input
             className="input"
+            disabled={lockedFields.institution}
             onChange={(event) => updateSection('academic', { institution: event.target.value })}
             placeholder="Enter institution name"
             type="text"
@@ -130,12 +162,14 @@ export default function AcademicDetailsPage() {
           {errors.institution ? <small className="form-error">{errors.institution}</small> : null}
         </label>
 
+        {saveError ? <p className="form-error">{saveError}</p> : null}
+
         <div className="button-row">
           <button className="button button--ghost" onClick={() => navigate('/personal-details')} type="button">
             Back
           </button>
-          <button className="button button--primary" type="submit">
-            Continue to financial details
+          <button className="button button--primary" disabled={isSaving} type="submit">
+            {isSaving ? 'Saving...' : 'Continue to financial details'}
           </button>
         </div>
       </form>

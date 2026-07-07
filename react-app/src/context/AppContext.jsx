@@ -9,12 +9,97 @@ import {
   programs,
   recommendedPrograms,
 } from '../data/mockData';
+import { URL } from '../util/api';
+import { get, put } from '../util/request';
 
 const STORAGE_KEY = 'scholarhub-react-state-v1';
 const USERS_UPDATED_KEY = 'scholarhub-users-updated-at';
+const lockedFieldSections = {
+  personal: ['fullName', 'dob', 'gender', 'state', 'city', 'mobile'],
+  academic: ['course', 'stream', 'year', 'institution', 'marks'],
+  financial: ['incomeRange', 'category', 'hostelResident', 'certificateName'],
+};
 
-const defaultState = {
-  authMode: 'login',
+// Maps local form field names to the /user/profile backend field names.
+// Only fields with a confirmed backend equivalent (seen in applyUserProfile's
+// GET response mapping) are listed — fields without one (academic: stream,
+// year; financial: incomeRange, hostelResident, certificateName) are
+// intentionally left out rather than guessed, and stay local-only for now.
+const PERSONAL_FIELD_TO_PAYLOAD_KEY = {
+  fullName: 'name',
+  dob: 'dateOfBirth',
+  gender: 'gender',
+  state: 'state',
+  city: 'city',
+  mobile: 'mobile',
+};
+
+const ACADEMIC_FIELD_TO_PAYLOAD_KEY = {
+  course: 'educationLevel',
+  institution: 'collegeName',
+  marks: 'cgpa',
+};
+
+const FINANCIAL_FIELD_TO_PAYLOAD_KEY = {
+  category: 'category',
+};
+
+function isFieldSaved(value) {
+  if (value === undefined || value === null) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  return true;
+}
+
+function createSectionLocks(fieldNames) {
+  return fieldNames.reduce((locks, fieldName) => {
+    locks[fieldName] = false;
+    return locks;
+  }, {});
+}
+
+function createDefaultLockedFields() {
+  return {
+    personal: createSectionLocks(lockedFieldSections.personal),
+    academic: createSectionLocks(lockedFieldSections.academic),
+    financial: createSectionLocks(lockedFieldSections.financial),
+  };
+}
+
+function createLockedFieldsFromValues(stateLike) {
+  const defaultLockedFields = createDefaultLockedFields();
+
+  return {
+    personal: lockedFieldSections.personal.reduce(
+      (locks, fieldName) => ({
+        ...locks,
+        [fieldName]: isFieldSaved(stateLike.personal?.[fieldName]),
+      }),
+      defaultLockedFields.personal
+    ),
+    academic: lockedFieldSections.academic.reduce(
+      (locks, fieldName) => ({
+        ...locks,
+        [fieldName]: isFieldSaved(stateLike.academic?.[fieldName]),
+      }),
+      defaultLockedFields.academic
+    ),
+    financial: lockedFieldSections.financial.reduce(
+      (locks, fieldName) => ({
+        ...locks,
+        [fieldName]: isFieldSaved(stateLike.financial?.[fieldName]),
+      }),
+      defaultLockedFields.financial
+    ),
+  };
+}
+
+const legacyDemoState = {
   profile: {
     name: 'Arjun Kumar',
     email: 'arjun.kumar@example.com',
@@ -47,6 +132,43 @@ const defaultState = {
     hostelResident: 'No',
     certificateName: 'income-certificate.pdf',
   },
+};
+
+const defaultState = {
+  authMode: 'login',
+  profile: {
+    name: '',
+    email: '',
+    phone: '',
+    course: '',
+    year: '',
+    educationLevel: '',
+    studentType: '',
+  },
+  personal: {
+    fullName: '',
+    dob: '',
+    gender: '',
+    state: '',
+    city: '',
+    mobile: '',
+  },
+  academic: {
+    studentType: '',
+    course: '',
+    stream: '',
+    year: '',
+    institution: '',
+    marks: '',
+  },
+  financial: {
+    incomeRange: '',
+    annualIncome: '',
+    category: '',
+    hostelResident: '',
+    certificateName: '',
+  },
+  lockedFields: createDefaultLockedFields(),
   registration: {
     status: 'idle',
     registeredAt: null,
@@ -62,6 +184,17 @@ const defaultState = {
 
 const AppContext = createContext(null);
 
+function isLegacyDemoState(state) {
+  return (
+    state.profile.name === legacyDemoState.profile.name &&
+    state.profile.email === legacyDemoState.profile.email &&
+    state.personal.fullName === legacyDemoState.personal.fullName &&
+    state.personal.mobile === legacyDemoState.personal.mobile &&
+    state.academic.institution === legacyDemoState.academic.institution &&
+    state.financial.certificateName === legacyDemoState.financial.certificateName
+  );
+}
+
 function loadState() {
   if (typeof window === 'undefined') {
     return defaultState;
@@ -74,7 +207,7 @@ function loadState() {
     }
 
     const parsed = JSON.parse(raw);
-    return {
+    const mergedState = {
       ...defaultState,
       ...parsed,
       profile: { ...defaultState.profile, ...parsed.profile },
@@ -83,6 +216,28 @@ function loadState() {
       financial: { ...defaultState.financial, ...parsed.financial },
       registration: { ...defaultState.registration, ...parsed.registration },
     };
+    const computedLockedFields = createLockedFieldsFromValues(mergedState);
+    const mergedLockedFields = {
+      personal: parsed.lockedFields?.personal
+        ? { ...computedLockedFields.personal, ...parsed.lockedFields.personal }
+        : computedLockedFields.personal,
+      academic: parsed.lockedFields?.academic
+        ? { ...computedLockedFields.academic, ...parsed.lockedFields.academic }
+        : computedLockedFields.academic,
+      financial: parsed.lockedFields?.financial
+        ? { ...computedLockedFields.financial, ...parsed.lockedFields.financial }
+        : computedLockedFields.financial,
+    };
+    const normalizedState = {
+      ...mergedState,
+      lockedFields: mergedLockedFields,
+    };
+
+    if (isLegacyDemoState(normalizedState)) {
+      return defaultState;
+    }
+
+    return normalizedState;
   } catch {
     return defaultState;
   }
@@ -106,6 +261,35 @@ function getIncomeRangeLabel(income) {
   }
 
   return 'Above Rs 8,00,000';
+}
+
+function getAuthToken() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return window.localStorage.getItem('scholarhub-auth-token') || window.localStorage.getItem('token') || '';
+}
+
+function formatDateForInput(value) {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getCleanString(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function getAssistantReply(text, state) {
@@ -164,12 +348,192 @@ export function AppProvider({ children }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  useEffect(() => {
+    const token = getAuthToken();
+
+    if (!token) {
+      return;
+    }
+
+    const hasProfileSnapshot =
+      Boolean(state.profile.email) ||
+      Boolean(state.personal.fullName) ||
+      Boolean(state.personal.mobile) ||
+      Boolean(state.academic.institution);
+
+    if (hasProfileSnapshot) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const hydrateFromToken = async () => {
+      try {
+        const profile = await get(URL.Profile, {
+          headers: { Authorization: token },
+        });
+
+        if (isCancelled) {
+          return;
+        }
+
+        applyUserProfile(profile);
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        if (error.status === 401 || error.status === 403) {
+          window.localStorage.removeItem('scholarhub-auth-token');
+          window.localStorage.removeItem('token');
+        }
+      }
+    };
+
+    hydrateFromToken();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [state.profile.email, state.personal.fullName, state.personal.mobile, state.academic.institution]);
+
   const setAuthMode = (mode) => {
     setState((current) => ({
       ...current,
       authMode: mode,
     }));
   };
+
+  const applyUserProfile = (userProfile) => {
+    const annualIncome = Number(userProfile?.income);
+    const cgpa = Number(userProfile?.cgpa);
+    const fullName = getCleanString(userProfile?.name);
+    const email = getCleanString(userProfile?.email).toLowerCase();
+    const mobile = getCleanString(userProfile?.mobile);
+    const educationLevel = getCleanString(userProfile?.educationLevel);
+    const studentType = getCleanString(userProfile?.studentType);
+    const city = getCleanString(userProfile?.city);
+    const collegeName = getCleanString(userProfile?.collegeName);
+    const stateName = getCleanString(userProfile?.state);
+    const category = getCleanString(userProfile?.category);
+    const gender = getCleanString(userProfile?.gender);
+
+    setState((current) => ({
+      ...current,
+      profile: {
+        ...current.profile,
+        name: fullName,
+        email,
+        phone: mobile,
+        educationLevel,
+        studentType,
+      },
+      personal: {
+        ...current.personal,
+        fullName,
+        dob: formatDateForInput(userProfile?.dateOfBirth),
+        gender,
+        state: stateName,
+        city,
+        mobile,
+      },
+      academic: {
+        ...current.academic,
+        studentType,
+        course: educationLevel || current.academic.course,
+        institution: collegeName,
+        marks: Number.isFinite(cgpa) ? String(cgpa) : current.academic.marks,
+      },
+      financial: {
+        ...current.financial,
+        annualIncome: Number.isFinite(annualIncome) ? annualIncome : current.financial.annualIncome,
+        incomeRange: Number.isFinite(annualIncome)
+          ? getIncomeRangeLabel(annualIncome)
+          : current.financial.incomeRange,
+        category,
+      },
+      lockedFields: createLockedFieldsFromValues({
+        ...current,
+        personal: {
+          ...current.personal,
+          fullName,
+          dob: formatDateForInput(userProfile?.dateOfBirth),
+          gender,
+          state: stateName,
+          city,
+          mobile,
+        },
+        academic: {
+          ...current.academic,
+          studentType,
+          course: educationLevel || current.academic.course,
+          institution: collegeName,
+          marks: Number.isFinite(cgpa) ? String(cgpa) : current.academic.marks,
+        },
+        financial: {
+          ...current.financial,
+          annualIncome: Number.isFinite(annualIncome) ? annualIncome : current.financial.annualIncome,
+          incomeRange: Number.isFinite(annualIncome)
+            ? getIncomeRangeLabel(annualIncome)
+            : current.financial.incomeRange,
+          category,
+        },
+      }),
+      registration: {
+        ...current.registration,
+        status: 'registered',
+        lastResponse: userProfile,
+      },
+    }));
+  };
+
+  const hydrateUserProfile = async (token = getAuthToken()) => {
+    if (!token) {
+      return null;
+    }
+
+    const profile = await get(URL.Profile, {
+      headers: { Authorization: token },
+    });
+
+    applyUserProfile(profile);
+    return profile;
+  };
+
+  const saveProfileFields = async (changedValues, fieldToPayloadKey) => {
+    const payload = Object.entries(changedValues).reduce((acc, [field, value]) => {
+      const payloadKey = fieldToPayloadKey[field];
+      if (!payloadKey || value === undefined) return acc;
+      acc[payloadKey] = typeof value === 'string' ? value.trim() : value;
+      return acc;
+    }, {});
+
+    if (Object.keys(payload).length === 0) {
+      return null;
+    }
+
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('You need to be logged in to save your details.');
+    }
+
+    return put(URL.Profile, payload, { headers: { Authorization: token } });
+  };
+
+  const savePersonalDetails = (changedPersonalDetails) =>
+    saveProfileFields(changedPersonalDetails, PERSONAL_FIELD_TO_PAYLOAD_KEY);
+
+  const saveAcademicDetails = (changedAcademicDetails) => {
+    const normalized = { ...changedAcademicDetails };
+    if (normalized.marks !== undefined) {
+      const numericMarks = Number(normalized.marks);
+      normalized.marks = Number.isFinite(numericMarks) ? numericMarks : normalized.marks;
+    }
+    return saveProfileFields(normalized, ACADEMIC_FIELD_TO_PAYLOAD_KEY);
+  };
+
+  const saveFinancialDetails = (changedFinancialDetails) =>
+    saveProfileFields(changedFinancialDetails, FINANCIAL_FIELD_TO_PAYLOAD_KEY);
 
   const applyRegistrationProfile = (registrationForm, response) => {
     const annualIncome = Number(registrationForm.income);
@@ -192,23 +556,59 @@ export function AppProvider({ children }) {
         dob: registrationForm.dateOfBirth,
         gender: registrationForm.gender,
         state: registrationForm.state,
+        city: '',
         mobile: registrationForm.mobile.trim(),
       },
       academic: {
         ...current.academic,
         studentType: registrationForm.studentType,
         course: registrationForm.educationLevel,
+        stream: '',
+        year: '',
         institution: registrationForm.collegeName.trim(),
-        marks: Number.isFinite(cgpa) ? String(cgpa) : current.academic.marks,
+        marks: Number.isFinite(cgpa) ? String(cgpa) : '',
       },
       financial: {
         ...current.financial,
         category: registrationForm.category,
         annualIncome,
+        hostelResident: '',
+        certificateName: '',
         incomeRange: Number.isFinite(annualIncome)
           ? getIncomeRangeLabel(annualIncome)
-          : current.financial.incomeRange,
+          : '',
       },
+      lockedFields: createLockedFieldsFromValues({
+        ...current,
+        personal: {
+          ...current.personal,
+          fullName: registrationForm.name.trim(),
+          dob: registrationForm.dateOfBirth,
+          gender: registrationForm.gender,
+          state: registrationForm.state,
+          city: '',
+          mobile: registrationForm.mobile.trim(),
+        },
+        academic: {
+          ...current.academic,
+          studentType: registrationForm.studentType,
+          course: registrationForm.educationLevel,
+          stream: '',
+          year: '',
+          institution: registrationForm.collegeName.trim(),
+          marks: Number.isFinite(cgpa) ? String(cgpa) : '',
+        },
+        financial: {
+          ...current.financial,
+          category: registrationForm.category,
+          annualIncome,
+          hostelResident: '',
+          certificateName: '',
+          incomeRange: Number.isFinite(annualIncome)
+            ? getIncomeRangeLabel(annualIncome)
+            : '',
+        },
+      }),
       registration: {
         status: 'registered',
         registeredAt,
@@ -224,6 +624,25 @@ export function AppProvider({ children }) {
         })
       );
     }
+  };
+
+  const lockSectionFields = (section, fieldNames) => {
+    setState((current) => ({
+      ...current,
+      lockedFields: {
+        ...current.lockedFields,
+        [section]: {
+          ...current.lockedFields[section],
+          ...fieldNames.reduce((locks, fieldName) => {
+            if (isFieldSaved(current[section]?.[fieldName])) {
+              locks[fieldName] = true;
+            }
+
+            return locks;
+          }, {}),
+        },
+      },
+    }));
   };
 
   const updateSection = (section, updates) => {
@@ -357,6 +776,12 @@ export function AppProvider({ children }) {
     state,
     setAuthMode,
     applyRegistrationProfile,
+    applyUserProfile,
+    hydrateUserProfile,
+    savePersonalDetails,
+    saveAcademicDetails,
+    saveFinancialDetails,
+    lockSectionFields,
     updateSection,
     toggleDeclaration,
     setSelectedProgram,

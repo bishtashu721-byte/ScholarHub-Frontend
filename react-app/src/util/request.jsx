@@ -33,7 +33,10 @@ export async function get(url, config = {}) {
     const response = await requestClient.get(url, config);
     return response.data;
   } catch (error) {
-    throw new Error(getErrorMessage(error, 'Unable to load data right now.'));
+    const requestError = new Error(getErrorMessage(error, 'Unable to load data right now.'));
+    requestError.code = error.code;
+    requestError.status = error.response?.status;
+    throw requestError;
   }
 }
 

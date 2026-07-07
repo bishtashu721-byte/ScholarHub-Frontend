@@ -1,4 +1,5 @@
-import { Link, NavLink } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { portalNav } from '../data/mockData';
 import { useAppContext } from '../context/AppContext';
 
@@ -12,7 +13,25 @@ function getInitials(name) {
 }
 
 export function PortalTopBar() {
+  const navigate = useNavigate();
   const { state, profileCompletion, unreadNotifications } = useAppContext();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleDocumentClick = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setMenuOpen(false);
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
+
+  const handleLogout = () => {
+    window.localStorage.removeItem('scholarhub-auth-token');
+    window.localStorage.removeItem('token');
+    window.localStorage.removeItem('scholarhub-react-state-v1');
+    navigate('/login');
+  };
 
   return (
     <header className="portal-topbar">
@@ -41,8 +60,20 @@ export function PortalTopBar() {
 
       <div className="portal-meta">
         <span className="meta-pill">{profileCompletion}% profile complete</span>
-        <div className="meta-avatar" aria-label={state.profile.name}>
-          {getInitials(state.profile.name)}
+        <div className="meta-account" ref={menuRef}>
+          <button
+            aria-label={state.profile.name}
+            className="meta-avatar"
+            onClick={() => setMenuOpen((open) => !open)}
+            type="button"
+          >
+            {getInitials(state.profile.name)}
+          </button>
+          <div className={`meta-dropdown${menuOpen ? ' meta-dropdown--open' : ''}`}>
+            <button className="meta-dropdown__item meta-dropdown__item--danger" onClick={handleLogout} type="button">
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     </header>

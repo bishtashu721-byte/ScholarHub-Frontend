@@ -91,7 +91,7 @@ function getLoginRedirectPath(email, response) {
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { applyRegistrationProfile, state, setAuthMode } = useAppContext();
+  const { applyRegistrationProfile, hydrateUserProfile, state, setAuthMode } = useAppContext();
   const [loginForm, setLoginForm] = useState({
     emailOrPhone: state.profile.email,
     password: '',
@@ -147,6 +147,7 @@ export default function LandingPage() {
 
       const token = getLoginToken(response);
       window.localStorage.setItem('scholarhub-auth-token', token);
+      await hydrateUserProfile(token);
       navigate(getLoginRedirectPath(email, response));
     } catch (error) {
       window.localStorage.removeItem('scholarhub-auth-token');
