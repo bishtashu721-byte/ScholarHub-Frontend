@@ -50,3 +50,17 @@ export async function post(url, data = {}, config = {}) {
     throw requestError;
   }
 }
+
+export async function put(url, data = {}, config = {}) {
+  try {
+    const response = await requestClient.put(url, data, config);
+    return response.data;
+  } catch (error) {
+    const requestError = new Error(
+      getErrorMessage(error, 'Unable to update the record right now.')
+    );
+    requestError.code = error.code;
+    requestError.status = error.response?.status;
+    throw requestError;
+  }
+}

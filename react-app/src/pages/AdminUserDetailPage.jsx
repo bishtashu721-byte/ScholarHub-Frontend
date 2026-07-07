@@ -102,11 +102,6 @@ const ICONS = {
   ),
 };
 
-const TABS = [
-  { key: 'overview', label: 'Overview', icon: ICONS.tag },
-  { key: 'personal', label: 'Personal Details', icon: ICONS.user },
-];
-
 function formatRegisteredOn(dateObj) {
   if (!dateObj || dateObj.getTime() === 0) return 'N/A';
   return dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -115,9 +110,9 @@ function formatRegisteredOn(dateObj) {
 export default function AdminUserDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { users, statusMessage } = useAdminUsers();
-  const [activeTab, setActiveTab] = useState('overview');
+  const { users, statusMessage, updateUserApproval } = useAdminUsers();
   const [search, setSearch] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -127,6 +122,34 @@ export default function AdminUserDetailPage() {
   const adminMenuRef = useRef(null);
 
   const user = users.find((candidate) => candidate.id === id) || null;
+  const profileSummary = user
+    ? [
+        { key: 'studentType', label: 'Student Type', value: user.studentType, icon: ICONS.academic },
+        { key: 'educationLevel', label: 'Education Level', value: user.educationLevel, icon: ICONS.applications },
+        { key: 'category', label: 'Category', value: user.category, icon: ICONS.tag },
+        { key: 'cgpa', label: 'CGPA', value: user.cgpa, icon: ICONS.financial },
+      ]
+    : [];
+  const personalDetails = user
+    ? [
+        { key: 'name', label: 'Full Name', value: user.name, icon: ICONS.user },
+        { key: 'email', label: 'Email Address', value: user.email, icon: ICONS.mail },
+        { key: 'mobile', label: 'Mobile Number', value: user.mobile, icon: ICONS.phone },
+        { key: 'collegeName', label: 'College Name', value: user.collegeName, icon: ICONS.building },
+        { key: 'userId', label: 'User ID', value: user.id, icon: ICONS.shield, mono: true },
+        { key: 'registeredOn', label: 'Registered On', value: formatRegisteredOn(user.dateObj), icon: ICONS.calendar },
+      ]
+    : [];
+  const academicDetails = user
+    ? [
+        { key: 'studentType', label: 'Student Type', value: user.studentType, icon: ICONS.academic },
+        { key: 'educationLevel', label: 'Education Level', value: user.educationLevel, icon: ICONS.applications },
+        { key: 'gender', label: 'Gender', value: user.gender, icon: ICONS.gender },
+        { key: 'category', label: 'Category', value: user.category, icon: ICONS.tag },
+        { key: 'cgpa', label: 'CGPA', value: user.cgpa, icon: ICONS.financial },
+        { key: 'role', label: 'Role', value: user.role, icon: ICONS.shield, roleClass: user.roleClass },
+      ]
+    : [];
 
   useEffect(() => {
     if (!toastMessage) return undefined;
@@ -161,6 +184,20 @@ export default function AdminUserDetailPage() {
     window.localStorage.removeItem('token');
     window.localStorage.removeItem('scholarhub-react-state-v1');
     navigate('/login');
+  };
+
+  const handleReviewAction = async (approvalStatus) => {
+    if (!user || user.approvalStatus === approvalStatus) return;
+
+    try {
+      setReviewing(true);
+      await updateUserApproval(user.id, approvalStatus);
+      setToastMessage(`${user.name} ${approvalStatus} successfully`);
+    } catch (error) {
+      setToastMessage(error.message || `Unable to mark ${user?.name || 'user'} as ${approvalStatus}.`);
+    } finally {
+      setReviewing(false);
+    }
   };
 
   return (
@@ -325,177 +362,109 @@ export default function AdminUserDetailPage() {
         ) : (
           <>
             <div className="ud-profile-card">
-              <div className="ud-profile-avatar" style={{ background: user.color }}>
-                {user.initials}
-              </div>
-              <div className="ud-profile-info">
-                <div className="ud-profile-name-line">
-                  <span className="ud-profile-name">{user.name}</span>
-                  <span className={`status-pill ${user.roleClass || 'neutral'}`}>{user.role}</span>
+              <div className="ud-profile-main">
+                <div className="ud-profile-avatar" style={{ background: user.color }}>
+                  {user.initials}
                 </div>
-                <div className="ud-profile-id">User ID: {user.id}</div>
-                <div className="ud-profile-reg">Registered On: {formatRegisteredOn(user.dateObj)}</div>
-                <div className="ud-contact-row">
-                  <span className="ud-contact-item">
-                    {ICONS.mail} {user.email}
-                  </span>
-                  <span className="ud-contact-item">
-                    {ICONS.phone} {user.mobile}
-                  </span>
-                  <span className="ud-contact-item">
-                    {ICONS.building} {user.collegeName}
-                  </span>
+                <div className="ud-profile-info">
+                  <div className="ud-profile-name-line">
+                    <span className="ud-profile-name">{user.name}</span>
+                    <span className={`status-pill ${user.roleClass || 'neutral'}`}>{user.role}</span>
+                  </div>
+                  <div className="ud-profile-id">User ID: {user.id}</div>
+                  <div className="ud-profile-reg">Registered On: {formatRegisteredOn(user.dateObj)}</div>
+                  <div className="ud-contact-row">
+                    <span className="ud-contact-chip">
+                      {ICONS.mail} {user.email}
+                    </span>
+                    <span className="ud-contact-chip">
+                      {ICONS.phone} {user.mobile}
+                    </span>
+                    <span className="ud-contact-chip">
+                      {ICONS.building} {user.collegeName}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="ud-tabs">
-              {TABS.map((tab) => (
-                <button
-                  className={`ud-tab${activeTab === tab.key ? ' active' : ''}`}
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  type="button"
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
+              <div className="ud-profile-side">
+                <div className="ud-profile-toolbar">
+                  <div className="ud-review-meta">
+                    <span className="ud-review-label">Review Status</span>
+                    <span className={`status-pill ${user.approvalStatusClass}`}>{user.approvalStatusLabel}</span>
+                  </div>
+                  <div className="decision-actions">
+                    <button
+                      className={`decision-btn decision-btn--accept${user.approvalStatus === 'accepted' ? ' active' : ''}`}
+                      disabled={reviewing}
+                      onClick={() => handleReviewAction('accepted')}
+                      type="button"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      className={`decision-btn decision-btn--reject${user.approvalStatus === 'rejected' ? ' active' : ''}`}
+                      disabled={reviewing}
+                      onClick={() => handleReviewAction('rejected')}
+                      type="button"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+                <div className="ud-profile-summary-grid">
+                {profileSummary.map((item) => (
+                  <div className="ud-profile-summary-card" key={item.key}>
+                    <div className="ud-profile-summary-icon">{item.icon}</div>
+                    <div>
+                      <div className="ud-profile-summary-label">{item.label}</div>
+                      <div className="ud-profile-summary-value">{item.value}</div>
+                    </div>
+                  </div>
+                ))}
+                </div>
+              </div>
             </div>
 
             <div className="ud-body">
-              {activeTab === 'overview' ? (
-                <div className="ud-overview-grid">
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.academic}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">Student Type</div>
-                      <div className="ud-overview-mini-value">{user.studentType}</div>
-                    </div>
+              <div className="ud-detail-layout">
+                <section className="ud-detail-card">
+                  <div className="ud-section-title">
+                    {ICONS.user} Personal Details
                   </div>
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.applications}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">Education Level</div>
-                      <div className="ud-overview-mini-value">{user.educationLevel}</div>
-                    </div>
+                  <div className="ud-field-grid">
+                    {personalDetails.map((item) => (
+                      <div className="ud-field-card" key={item.key}>
+                        <div className="ud-field-icon">{item.icon}</div>
+                        <div className="ud-field-content">
+                          <div className="ud-field-label">{item.label}</div>
+                          <div className={`ud-field-value${item.mono ? ' mono' : ''}`}>{item.value}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.gender}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">Gender</div>
-                      <div className="ud-overview-mini-value">{user.gender}</div>
-                    </div>
+                </section>
+
+                <section className="ud-detail-card">
+                  <div className="ud-section-title">
+                    {ICONS.shield} Academic & Account Snapshot
                   </div>
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.financial}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">CGPA</div>
-                      <div className="ud-overview-mini-value">{user.cgpa}</div>
-                    </div>
+                  <div className="ud-field-grid">
+                    {academicDetails.map((item) => (
+                      <div className="ud-field-card ud-field-card-accent" key={item.key}>
+                        <div className="ud-field-icon">{item.icon}</div>
+                        <div className="ud-field-content">
+                          <div className="ud-field-label">{item.label}</div>
+                          {item.roleClass ? (
+                            <span className={`status-pill ${item.roleClass}`}>{item.value}</span>
+                          ) : (
+                            <div className="ud-field-value">{item.value}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.tag}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">Category</div>
-                      <div className="ud-overview-mini-value">{user.category}</div>
-                    </div>
-                  </div>
-                  <div className="ud-overview-mini">
-                    <div className="ud-overview-mini-icon">{ICONS.shield}</div>
-                    <div>
-                      <div className="ud-overview-mini-label">Role</div>
-                      <div className="ud-overview-mini-value">{user.role}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="ud-info-grid">
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.user}</div>
-                    <div>
-                      <div className="ud-info-label">Full Name</div>
-                      <div className="ud-info-value">{user.name}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.mail}</div>
-                    <div>
-                      <div className="ud-info-label">Email Address</div>
-                      <div className="ud-info-value">{user.email}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.phone}</div>
-                    <div>
-                      <div className="ud-info-label">Mobile Number</div>
-                      <div className="ud-info-value">{user.mobile}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.academic}</div>
-                    <div>
-                      <div className="ud-info-label">Student Type</div>
-                      <div className="ud-info-value">{user.studentType}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.applications}</div>
-                    <div>
-                      <div className="ud-info-label">Education Level</div>
-                      <div className="ud-info-value">{user.educationLevel}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.gender}</div>
-                    <div>
-                      <div className="ud-info-label">Gender</div>
-                      <div className="ud-info-value">{user.gender}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.building}</div>
-                    <div>
-                      <div className="ud-info-label">College Name</div>
-                      <div className="ud-info-value">{user.collegeName}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.financial}</div>
-                    <div>
-                      <div className="ud-info-label">CGPA</div>
-                      <div className="ud-info-value">{user.cgpa}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.tag}</div>
-                    <div>
-                      <div className="ud-info-label">Category</div>
-                      <div className="ud-info-value">{user.category}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.shield}</div>
-                    <div>
-                      <div className="ud-info-label">Role</div>
-                      <div className="ud-info-value">{user.role}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.tag}</div>
-                    <div>
-                      <div className="ud-info-label">User ID</div>
-                      <div className="ud-info-value">{user.id}</div>
-                    </div>
-                  </div>
-                  <div className="ud-info-item">
-                    <div className="ud-info-icon">{ICONS.calendar}</div>
-                    <div>
-                      <div className="ud-info-label">Registered On</div>
-                      <div className="ud-info-value">{formatRegisteredOn(user.dateObj)}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                </section>
+              </div>
             </div>
           </>
         )}

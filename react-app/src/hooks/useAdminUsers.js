@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { get } from '../util/request';
+import { get, put } from '../util/request';
 import { URL } from '../util/api';
 
 const AVATAR_COLORS = ['#4927EF', '#EC4899', '#F59E0B', '#16A34A', '#3B82F6', '#8B5CF6', '#EF4444', '#0EA5E9'];
@@ -59,10 +59,17 @@ function normalizeDashboardUser(record, index) {
   const mongoId = cleanValue(record._id || record.id);
   const rawRole = cleanValue(record.role);
   const normalizedRole = rawRole === 'N/A' ? '' : rawRole.toLowerCase();
+  const fallbackApprovalStatus = normalizedRole === 'admin' ? 'accepted' : 'pending';
+  const rawApprovalStatus = cleanValue(record.approvalStatus, fallbackApprovalStatus);
+  const normalizedApprovalStatus = ['accepted', 'rejected', 'pending'].includes(rawApprovalStatus.toLowerCase())
+    ? rawApprovalStatus.toLowerCase()
+    : fallbackApprovalStatus;
   const dateObj = getRecordCreatedAt(record) || new Date(0);
   const name = cleanValue(record.name, record.email || 'N/A');
   const role = normalizedRole ? normalizedRole[0].toUpperCase() + normalizedRole.slice(1) : 'N/A';
   const roleClass = normalizedRole === 'admin' ? 'admin' : normalizedRole === 'user' ? 'user' : 'neutral';
+  const approvalStatusLabel =
+    normalizedApprovalStatus[0].toUpperCase() + normalizedApprovalStatus.slice(1);
 
   return {
     id: mongoId,
@@ -78,6 +85,9 @@ function normalizeDashboardUser(record, index) {
     dateObj,
     role,
     roleClass,
+    approvalStatus: normalizedApprovalStatus,
+    approvalStatusLabel,
+    approvalStatusClass: normalizedApprovalStatus,
     color: AVATAR_COLORS[index % AVATAR_COLORS.length],
     initials: getInitialsFromUser(name, record.email),
   };
@@ -167,6 +177,34 @@ export function useAdminUsers() {
     return requestInFlightRef.current;
   }, []);
 
+  const updateUserApproval = useCallback(async (userId, approvalStatus) => {
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error('Login as admin to review users.');
+    }
+
+    if (getAuthRole(token) !== 'admin') {
+      throw new Error('Admin access is required to review users.');
+    }
+
+    const payload = await put(
+      URL.UserApproval(userId),
+      { approvalStatus },
+      { headers: { Authorization: token } }
+    );
+
+    const updatedUser = payload?.user;
+    if (updatedUser) {
+      setUsers((current) =>
+        current.map((user, index) =>
+          user.id === userId ? normalizeDashboardUser(updatedUser, index) : user
+        )
+      );
+    }
+
+    return payload;
+  }, []);
+
   useEffect(() => {
     load();
 
@@ -196,5 +234,5 @@ export function useAdminUsers() {
     };
   }, [load]);
 
-  return { users, stats, statusMessage, loading, refresh: load };
+  return { users, stats, statusMessage, loading, refresh: load, updateUserApproval };
 }

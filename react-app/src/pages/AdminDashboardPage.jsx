@@ -162,7 +162,7 @@ function SortIcon() {
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { users, stats, statusMessage } = useAdminUsers();
+  const { users, stats, statusMessage, updateUserApproval } = useAdminUsers();
 
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
   const [roleFilter, setRoleFilter] = useState(() => searchParams.get('role') || 'all');
@@ -171,6 +171,7 @@ export default function AdminDashboardPage() {
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [reviewingUserId, setReviewingUserId] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -294,6 +295,25 @@ export default function AdminDashboardPage() {
     window.localStorage.removeItem('token');
     window.localStorage.removeItem('scholarhub-react-state-v1');
     navigate('/login');
+  };
+
+  const handleReviewAction = async (event, user, approvalStatus) => {
+    event.stopPropagation();
+    if (user.approvalStatus === approvalStatus) return;
+
+    try {
+      setReviewingUserId(user.id);
+      await updateUserApproval(user.id, approvalStatus);
+      setToastMessage(`${user.name} ${approvalStatus} successfully`);
+    } catch (error) {
+      setToastMessage(error.message || `Unable to mark ${user.name} as ${approvalStatus}.`);
+    } finally {
+      setReviewingUserId('');
+    }
+  };
+
+  const openUserDetails = (userId) => {
+    navigate(`/admin/users/${userId}`);
   };
 
   return (
@@ -512,26 +532,34 @@ export default function AdminDashboardPage() {
                       </tr>
                     ) : (
                       pageUsers.map((user) => (
-                        <tr key={user.id}>
+                        <tr
+                          className="clickable-row"
+                          key={user.id}
+                          onClick={() => openUserDetails(user.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              openUserDetails(user.id);
+                            }
+                          }}
+                          tabIndex={0}
+                        >
                           <td>
                             <input
                               checked={selectedIds.has(user.id)}
                               className="cb"
+                              onClick={(event) => event.stopPropagation()}
                               onChange={() => handleToggleSelect(user.id)}
                               type="checkbox"
                             />
                           </td>
                           <td>
-                            <button
-                              className="user-cell user-cell-link"
-                              onClick={() => navigate(`/admin/users/${user.id}`)}
-                              type="button"
-                            >
+                            <div className="user-cell user-cell-link">
                               <div className="avatar" style={{ background: user.color }}>
                                 {user.initials}
                               </div>
                               <span className="user-name">{user.name}</span>
-                            </button>
+                            </div>
                           </td>
                           <td style={{ color: 'var(--subtitle)' }}>{user.studentType}</td>
                           <td style={{ color: 'var(--subtitle)' }}>{user.educationLevel}</td>
@@ -542,18 +570,26 @@ export default function AdminDashboardPage() {
                             <span className={`status-pill ${user.roleClass || 'neutral'}`}>{user.role}</span>
                           </td>
                           <td>
-                            <div className="action-cell">
-                              <button
-                                className="icon-btn"
-                                onClick={() => navigate(`/admin/users/${user.id}`)}
-                                title="View user"
-                                type="button"
-                              >
-                                <svg fill="none" height="16" viewBox="0 0 16 16" width="16">
-                                  <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5Z" stroke="currentColor" strokeWidth="1.5" />
-                                  <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5" />
-                                </svg>
-                              </button>
+                            <div className="review-cell">
+                              <span className={`status-pill ${user.approvalStatusClass}`}>{user.approvalStatusLabel}</span>
+                              <div className="decision-actions">
+                                <button
+                                  className={`decision-btn decision-btn--accept${user.approvalStatus === 'accepted' ? ' active' : ''}`}
+                                  disabled={reviewingUserId === user.id}
+                                  onClick={(event) => handleReviewAction(event, user, 'accepted')}
+                                  type="button"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  className={`decision-btn decision-btn--reject${user.approvalStatus === 'rejected' ? ' active' : ''}`}
+                                  disabled={reviewingUserId === user.id}
+                                  onClick={(event) => handleReviewAction(event, user, 'rejected')}
+                                  type="button"
+                                >
+                                  Reject
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>

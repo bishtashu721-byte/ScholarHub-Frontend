@@ -3,4 +3,5 @@ export const URL = {
   Register: '/user/register',
   Users: '/admin/users',
   Stats: '/admin/stats',
+  UserApproval: (id) => `/admin/users/${id}/approval`,
 };
