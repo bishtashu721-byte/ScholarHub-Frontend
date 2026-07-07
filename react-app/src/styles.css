@@ -864,6 +864,20 @@ li {
   position: relative;
 }
 
+.meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.meta-chip:hover {
+  background: var(--primary-soft);
+}
+
 .meta-avatar {
   display: inline-flex;
   align-items: center;
@@ -871,16 +885,29 @@ li {
   width: 2.8rem;
   height: 2.8rem;
   border-radius: 50%;
-  border: none;
+  flex-shrink: 0;
   background: linear-gradient(135deg, var(--primary-soft), #cfddff);
   font-family: 'Sora', sans-serif;
   font-weight: 700;
-  cursor: pointer;
-  transition: box-shadow 0.15s;
 }
 
-.meta-avatar:hover {
-  box-shadow: 0 0 0 3px var(--primary-soft);
+.meta-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.25;
+}
+
+.meta-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.meta-role {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
 }
 
 .meta-dropdown {

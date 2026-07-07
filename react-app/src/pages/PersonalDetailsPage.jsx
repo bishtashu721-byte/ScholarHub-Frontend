@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApplicationShell } from '../components/ApplicationShell';
 import { states } from '../data/mockData';
@@ -7,13 +7,18 @@ import { isFieldFilled } from '../util/applicationFields';
 
 export default function PersonalDetailsPage() {
   const navigate = useNavigate();
-  const { lockSectionFields, state, updateSection, savePersonalDetails } = useAppContext();
+  const { hydrateUserProfile, lockSectionFields, state, updateSection, savePersonalDetails } =
+    useAppContext();
   const [errors, setErrors] = useState({});
   const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const values = state.personal;
   const lockedFields = state.lockedFields.personal;
+
+  useEffect(() => {
+    hydrateUserProfile().catch(() => {});
+  }, []);
 
   const validate = () => {
     const nextErrors = {};

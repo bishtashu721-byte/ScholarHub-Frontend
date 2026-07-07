@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PortalPage, SectionCard, StatTile, StatusPill } from '../components/PortalChrome';
 import { quickActions } from '../data/mockData';
@@ -9,11 +10,16 @@ export default function DashboardPage() {
     activityFeed,
     applicationItems,
     deadlineItems,
+    hydrateUserProfile,
     profileCompletion,
     recommendedPrograms,
     state,
     setSelectedProgram,
   } = useAppContext();
+
+  useEffect(() => {
+    hydrateUserProfile().catch(() => {});
+  }, []);
 
   return (
     <PortalPage
@@ -48,9 +54,9 @@ export default function DashboardPage() {
           </SectionCard>
 
           <div className="stat-row">
-            <StatTile detail="Best-fit programs" label="Matched" value="12" />
-            <StatTile detail="Started or submitted" label="Applications" value="3" />
-            <StatTile detail="Tracked reminders" label="Deadlines" value="5" />
+            <StatTile detail="Best-fit programs" label="Matched" value={recommendedPrograms.length} />
+            <StatTile detail="Started or submitted" label="Applications" value={applicationItems.length} />
+            <StatTile detail="Tracked reminders" label="Deadlines" value={deadlineItems.length} />
           </div>
 
           <SectionCard

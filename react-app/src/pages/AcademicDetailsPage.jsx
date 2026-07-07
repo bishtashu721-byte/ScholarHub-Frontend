@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApplicationShell } from '../components/ApplicationShell';
 import { courseOptions, streamOptions, yearOptions } from '../data/mockData';
@@ -7,13 +7,18 @@ import { isFieldFilled } from '../util/applicationFields';
 
 export default function AcademicDetailsPage() {
   const navigate = useNavigate();
-  const { lockSectionFields, state, updateSection, saveAcademicDetails } = useAppContext();
+  const { hydrateUserProfile, lockSectionFields, state, updateSection, saveAcademicDetails } =
+    useAppContext();
   const [errors, setErrors] = useState({});
   const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const values = state.academic;
   const lockedFields = state.lockedFields.academic;
+
+  useEffect(() => {
+    hydrateUserProfile().catch(() => {});
+  }, []);
 
   const validate = () => {
     const nextErrors = {};

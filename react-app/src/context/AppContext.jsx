@@ -144,6 +144,7 @@ const defaultState = {
     year: '',
     educationLevel: '',
     studentType: '',
+    role: '',
   },
   personal: {
     fullName: '',
@@ -292,6 +293,24 @@ function getCleanString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+// The backend's /user/profile route currently only returns JWT claims
+// (id, email, role, iat) rather than the stored user document, so `name`
+// is usually empty. Rather than show a blank "Welcome back," this derives
+// a readable display name from the email's local part as a fallback —
+// display-only, never written into the editable personal-details form.
+function deriveDisplayNameFromEmail(email) {
+  const localPart = email.split('@')[0] || '';
+  return localPart
+    .replace(/[._-]+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatRoleLabel(role) {
+  const cleanRole = getCleanString(role).toLowerCase().replace(/s$/, '');
+  return cleanRole ? cleanRole.charAt(0).toUpperCase() + cleanRole.slice(1) : '';
+}
+
 function getAssistantReply(text, state) {
   const normalized = text.toLowerCase();
   const selectedProgram =
@@ -417,16 +436,19 @@ export function AppProvider({ children }) {
     const stateName = getCleanString(userProfile?.state);
     const category = getCleanString(userProfile?.category);
     const gender = getCleanString(userProfile?.gender);
+    const role = formatRoleLabel(userProfile?.role);
+    const displayName = fullName || deriveDisplayNameFromEmail(email);
 
     setState((current) => ({
       ...current,
       profile: {
         ...current.profile,
-        name: fullName,
+        name: displayName,
         email,
         phone: mobile,
         educationLevel,
         studentType,
+        role,
       },
       personal: {
         ...current.personal,

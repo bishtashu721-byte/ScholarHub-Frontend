@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApplicationShell } from '../components/ApplicationShell';
 import { categoryOptions, incomeOptions } from '../data/mockData';
@@ -7,13 +7,18 @@ import { isFieldFilled } from '../util/applicationFields';
 
 export default function FinancialDetailsPage() {
   const navigate = useNavigate();
-  const { lockSectionFields, state, updateSection, saveFinancialDetails } = useAppContext();
+  const { hydrateUserProfile, lockSectionFields, state, updateSection, saveFinancialDetails } =
+    useAppContext();
   const [errors, setErrors] = useState({});
   const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const values = state.financial;
   const lockedFields = state.lockedFields.financial;
+
+  useEffect(() => {
+    hydrateUserProfile().catch(() => {});
+  }, []);
 
   const validate = () => {
     const nextErrors = {};

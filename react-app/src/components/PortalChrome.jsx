@@ -61,13 +61,12 @@ export function PortalTopBar() {
       <div className="portal-meta">
         <span className="meta-pill">{profileCompletion}% profile complete</span>
         <div className="meta-account" ref={menuRef}>
-          <button
-            aria-label={state.profile.name}
-            className="meta-avatar"
-            onClick={() => setMenuOpen((open) => !open)}
-            type="button"
-          >
-            {getInitials(state.profile.name)}
+          <button className="meta-chip" onClick={() => setMenuOpen((open) => !open)} type="button">
+            <div className="meta-avatar">{getInitials(state.profile.name)}</div>
+            <div className="meta-info">
+              <span className="meta-name">{state.profile.name || 'Student'}</span>
+              {state.profile.role ? <span className="meta-role">{state.profile.role}</span> : null}
+            </div>
           </button>
           <div className={`meta-dropdown${menuOpen ? ' meta-dropdown--open' : ''}`}>
             <button className="meta-dropdown__item meta-dropdown__item--danger" onClick={handleLogout} type="button">
